@@ -1,7 +1,7 @@
 FROM python:3.10-alpine3.18
 
 #Install all dependencies.
-RUN apk add --no-cache postgresql-libs gettext zlib libjpeg libxml2-dev libxslt-dev mysql-client mariadb-connector-c-dev mariadb-dev
+RUN apk add --no-cache postgresql-libs gettext zlib libjpeg libxml2-dev libxslt-dev mysql-client mariadb-connector-c-dev mariadb-dev git
 
 #Print all logs without buffering it.
 ENV PYTHONUNBUFFERED 1
