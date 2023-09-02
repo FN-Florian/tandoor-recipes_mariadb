@@ -45,3 +45,4 @@ pytest-factoryboy==2.5.1
 pyppeteer==1.0.2
 validators==0.20.0
 pytube==15.0.0
+mysqlclient==2.0.3
