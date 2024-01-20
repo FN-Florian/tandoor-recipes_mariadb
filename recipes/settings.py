@@ -44,7 +44,7 @@ INTERNAL_IPS = os.getenv('INTERNAL_IPS').split(
     ',') if os.getenv('INTERNAL_IPS') else ['127.0.0.1']
 
 # allow djangos wsgi server to server mediafiles
-GUNICORN_MEDIA = bool(int(os.getenv('GUNICORN_MEDIA', True)))
+GUNICORN_MEDIA = bool(int(os.getenv('GUNICORN_MEDIA', False)))
 
 if os.getenv('REVERSE_PROXY_AUTH') is not None:
     print('DEPRECATION WARNING: Environment var "REVERSE_PROXY_AUTH" is deprecated. Please use "REMOTE_USER_AUTH".')
@@ -57,6 +57,8 @@ COMMENT_PREF_DEFAULT = bool(int(os.getenv('COMMENT_PREF_DEFAULT', True)))
 FRACTION_PREF_DEFAULT = bool(int(os.getenv('FRACTION_PREF_DEFAULT', False)))
 KJ_PREF_DEFAULT = bool(int(os.getenv('KJ_PREF_DEFAULT', False)))
 STICKY_NAV_PREF_DEFAULT = bool(int(os.getenv('STICKY_NAV_PREF_DEFAULT', True)))
+MAX_OWNED_SPACES_PREF_DEFAULT = int(os.getenv('MAX_OWNED_SPACES_PREF_DEFAULT', 100))
+UNAUTHENTICATED_THEME_FROM_SPACE = int(os.getenv('UNAUTHENTICATED_THEME_FROM_SPACE', 0))
 
 # minimum interval that users can set for automatic sync of shopping lists
 SHOPPING_MIN_AUTOSYNC_INTERVAL = int(
@@ -68,7 +70,12 @@ ALLOWED_HOSTS = os.getenv('ALLOWED_HOSTS').split(
 if os.getenv('CSRF_TRUSTED_ORIGINS'):
     CSRF_TRUSTED_ORIGINS = os.getenv('CSRF_TRUSTED_ORIGINS').split(',')
 
-CORS_ORIGIN_ALLOW_ALL = True
+if CORS_ORIGIN_ALLOW_ALL := os.getenv('CORS_ORIGIN_ALLOW_ALL') is not None:
+    print(
+        'DEPRECATION WARNING: Environment var "CORS_ORIGIN_ALLOW_ALL" is deprecated. Please use "CORS_ALLOW_ALL_ORIGINS."')
+    CORS_ALLOW_ALL_ORIGINS = CORS_ORIGIN_ALLOW_ALL
+else:
+    CORS_ALLOW_ALL_ORIGINS = bool(int(os.getenv("CORS_ALLOW_ALL_ORIGINS", True)))
 
 LOGIN_REDIRECT_URL = "index"
 LOGOUT_REDIRECT_URL = "index"
@@ -85,12 +92,14 @@ DJANGO_TABLES2_PAGE_RANGE = 8
 HCAPTCHA_SITEKEY = os.getenv('HCAPTCHA_SITEKEY', '')
 HCAPTCHA_SECRET = os.getenv('HCAPTCHA_SECRET', '')
 
-FDA_API_KEY = os.getenv('FDA_API_KEY', 'DEMO_KEY')
+FDC_API_KEY = os.getenv('FDC_API_KEY', 'DEMO_KEY')
 
 SHARING_ABUSE = bool(int(os.getenv('SHARING_ABUSE', False)))
 SHARING_LIMIT = int(os.getenv('SHARING_LIMIT', 0))
 
 ACCOUNT_SIGNUP_FORM_CLASS = 'cookbook.forms.AllAuthSignupForm'
+
+DRF_THROTTLE_RECIPE_URL_IMPORT = os.getenv('DRF_THROTTLE_RECIPE_URL_IMPORT', '60/hour')
 
 TERMS_URL = os.getenv('TERMS_URL', '')
 PRIVACY_URL = os.getenv('PRIVACY_URL', '')
@@ -119,6 +128,7 @@ INSTALLED_APPS = [
     'django_tables2',
     'corsheaders',
     'crispy_forms',
+    'crispy_bootstrap4',
     'rest_framework',
     'rest_framework.authtoken',
     'django_cleanup.apps.CleanupConfig',
@@ -151,7 +161,8 @@ try:
                         INSTALLED_APPS.append(plugin_module)
 
                         plugin_config = {
-                            'name': plugin_class.verbose_name if hasattr(plugin_class, 'verbose_name') else plugin_class.name,
+                            'name': plugin_class.verbose_name if hasattr(plugin_class,
+                                                                         'verbose_name') else plugin_class.name,
                             'version': plugin_class.VERSION if hasattr(plugin_class, 'VERSION') else 'unknown',
                             'website': plugin_class.website if hasattr(plugin_class, 'website') else '',
                             'github': plugin_class.github if hasattr(plugin_class, 'github') else '',
@@ -159,7 +170,8 @@ try:
                             'base_path': os.path.join(BASE_DIR, 'recipes', 'plugins', d),
                             'base_url': plugin_class.base_url,
                             'bundle_name': plugin_class.bundle_name if hasattr(plugin_class, 'bundle_name') else '',
-                            'api_router_name': plugin_class.api_router_name if hasattr(plugin_class, 'api_router_name') else '',
+                            'api_router_name': plugin_class.api_router_name if hasattr(plugin_class,
+                                                                                       'api_router_name') else '',
                             'nav_main': plugin_class.nav_main if hasattr(plugin_class, 'nav_main') else '',
                             'nav_dropdown': plugin_class.nav_dropdown if hasattr(plugin_class, 'nav_dropdown') else '',
                         }
@@ -213,6 +225,7 @@ MIDDLEWARE = [
     'django.middleware.locale.LocaleMiddleware',
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
     'cookbook.helper.scope_middleware.ScopeMiddleware',
+    'allauth.account.middleware.AccountMiddleware',
 ]
 
 if DEBUG_TOOLBAR:
@@ -248,7 +261,8 @@ if LDAP_AUTH:
         ldap.SCOPE_SUBTREE,
         os.getenv('AUTH_LDAP_USER_SEARCH_FILTER_STR', '(uid=%(user)s)'),
     )
-    AUTH_LDAP_USER_ATTR_MAP = ast.literal_eval(os.getenv('AUTH_LDAP_USER_ATTR_MAP')) if os.getenv('AUTH_LDAP_USER_ATTR_MAP') else {
+    AUTH_LDAP_USER_ATTR_MAP = ast.literal_eval(os.getenv('AUTH_LDAP_USER_ATTR_MAP')) if os.getenv(
+        'AUTH_LDAP_USER_ATTR_MAP') else {
         'first_name': 'givenName',
         'last_name': 'sn',
         'email': 'mail',
@@ -345,7 +359,7 @@ WSGI_APPLICATION = 'recipes.wsgi.application'
 # Load settings from env files
 if os.getenv('DATABASE_URL'):
     match = re.match(
-        r'(?P<schema>\w+):\/\/(?P<user>[\w\d_-]+)(:(?P<password>[^@]+))?@(?P<host>[^:/]+)(:(?P<port>\d+))?(\/(?P<database>[\w\d\/\._-]+))?',
+        r'(?P<schema>\w+):\/\/(?:(?P<user>[\w\d_-]+)(?::(?P<password>[^@]+))?@)?(?P<host>[^:/]+)(?::(?P<port>\d+))?(?:/(?P<database>[\w\d/._-]+))?',
         os.getenv('DATABASE_URL')
     )
     settings = match.groupdict()
@@ -353,6 +367,8 @@ if os.getenv('DATABASE_URL'):
     if schema.startswith('postgres'):
         engine = 'django.db.backends.postgresql'
     elif schema == 'sqlite':
+        if not os.path.exists(db_path := os.path.dirname(settings['database'])):
+            os.makedirs(db_path)
         engine = 'django.db.backends.sqlite3'
     else:
         raise Exception("Unsupported database schema: '%s'" % schema)
@@ -431,7 +447,7 @@ for p in PLUGINS:
     if p['bundle_name'] != '':
         WEBPACK_LOADER[p['bundle_name']] = {
             'CACHE': not DEBUG,
-            'BUNDLE_DIR_NAME': f'vue/',  # must end with slash
+            'BUNDLE_DIR_NAME': 'vue/',  # must end with slash
             'STATS_FILE': os.path.join(p["base_path"], 'vue', 'webpack-stats.json'),
             'POLL_INTERVAL': 0.1,
             'TIMEOUT': None,
@@ -443,7 +459,11 @@ for p in PLUGINS:
 
 LANGUAGE_CODE = 'en'
 
-TIME_ZONE = os.getenv('TIMEZONE') if os.getenv('TIMEZONE') else 'Europe/Berlin'
+if os.getenv('TIMEZONE') is not None:
+    print('DEPRECATION WARNING: Environment var "TIMEZONE" is deprecated. Please use "TZ" instead.')
+    TIME_ZONE = os.getenv('TIMEZONE') if os.getenv('TIMEZONE') else 'Europe/Berlin'
+else:
+    TIME_ZONE = os.getenv('TZ') if os.getenv('TZ') else 'Europe/Berlin'
 
 USE_I18N = True
 

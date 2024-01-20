@@ -689,7 +689,7 @@
             <br/>
 
             <!-- bottom buttons save/close/view -->
-            <div class="row fixed-bottom p-2 b-2 border-top text-center" style="background: white"
+            <div class="row fixed-bottom p-2 b-2 border-top text-center bg-white bottom-action-bar"
                  v-if="recipe !== undefined">
                 <div class="col-3 col-md-6 mb-1 mb-md-0 pr-2 pl-2">
                     <a :href="resolveDjangoUrl('delete_recipe', recipe.id)"
@@ -936,10 +936,7 @@ export default {
                     // set default visibility style for each component of the step
                     this.recipe.steps.forEach((s) => {
                         this.$set(s, "time_visible", s.time !== 0)
-                        // ingredients_visible determines whether or not the ingredients UI is shown in the edit view
-                        // show_ingredients_table determine whether the ingredients table is shown in the read view
-                        // these are seperate as one might want to add ingredients but not want the step-level view
-                        this.$set(s, "ingredients_visible", s.show_ingredients_table && (s.ingredients.length > 0 || this.recipe.steps.length === 1))
+                        this.$set(s, "ingredients_visible", (s.ingredients.length > 0 || this.recipe.steps.length === 1))
                         this.$set(s, "instruction_visible", s.instruction !== "" || this.recipe.steps.length === 1)
                         this.$set(s, "step_recipe_visible", s.step_recipe !== null)
                         this.$set(s, "file_visible", s.file !== null)
@@ -1084,12 +1081,17 @@ export default {
             this.$nextTick(() => document.getElementById(`amount_${this.recipe.steps.indexOf(step)}_${step.ingredients.length - 1}`).select())
         },
         removeIngredient: function (step, ingredient) {
-            if (confirm(this.$t("confirm_delete", {object: this.$t("Ingredient")}))) {
+            let message = this.$t("confirm_delete", {object: this.$t("Ingredient")})
+            if (ingredient.food?.name) {
+                message = this.$t("delete_confirmation", {source: `"${ingredient.food.name}"`})
+            }
+            if (confirm(message)) {
                 step.ingredients = step.ingredients.filter((item) => item !== ingredient)
             }
         },
         removeStep: function (step) {
-            if (confirm(this.$t("confirm_delete", {object: this.$t("Step")}))) {
+            const step_index = this.recipe.steps.indexOf(step)
+            if (confirm(this.$t("delete_confirmation", {source: `${this.$t("Step")} "${step.name || step_index}"`}))) {
                 this.recipe.steps = this.recipe.steps.filter((item) => item !== step)
             }
         },
